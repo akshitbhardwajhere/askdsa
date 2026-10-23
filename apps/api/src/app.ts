@@ -5,6 +5,7 @@ import { pinoHttp } from "pino-http";
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { problemsRouter } from "./routes/problems.js";
 
 export const app = express();
 
@@ -55,6 +56,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/health", healthRouter);
+app.use("/api/problems", problemsRouter);
 
 app.use((_req, res) => {
   res.status(404).json({
