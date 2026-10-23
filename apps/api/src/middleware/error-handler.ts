@@ -1,4 +1,3 @@
-
 import type { ErrorRequestHandler } from "express";
 
 interface HttpError extends Error {
@@ -14,7 +13,7 @@ export const errorHandler: ErrorRequestHandler = (
   _next,
 ) => {
   if (res.headersSent) {
-    _next(error)
+    _next(error);
     return;
   }
 
