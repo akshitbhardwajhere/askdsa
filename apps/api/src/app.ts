@@ -9,7 +9,22 @@ export const app = express();
 
 app.disable("x-powered-by");
 app.use(helmet());
-app.use(cors());
+
+app.use(
+  cors({
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin || requestOrigin === env.WEB_ORIGIN) {
+        callback(null, requestOrigin || false);
+        return;
+      }
+
+      callback(null, false);
+    },
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  }),
+);
+
 app.use(express.json({ limit: "32kb" }));
 
 app.use(

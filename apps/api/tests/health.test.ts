@@ -76,4 +76,26 @@ describe("API endpoints", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("x-frame-options")).toBe("SAMEORIGIN");
   });
+
+  it("allows the configured frontend origin", async () => {
+    const response = await fetch(`${baseUrl}/health`, {
+      headers: {
+        Origin: "http://localhost:3000",
+      },
+    });
+
+    expect(response.headers.get("access-control-allow-origin")).toBe(
+      "http://localhost:3000",
+    );
+  });
+
+  it("does not grant CORS access to an untrusted origin", async () => {
+    const response = await fetch(`${baseUrl}/health`, {
+      headers: {
+        Origin: "https://untrusted.example",
+      },
+    });
+
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+  });
 });
