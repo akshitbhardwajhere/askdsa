@@ -1,11 +1,68 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { app } from "../src/app.js";
+import { db, pool } from "../src/db/index.js";
+import { problems } from "../src/db/schema.js";
+import { inArray } from "drizzle-orm";
+
+const testProblems = [
+  {
+    id: "test_prob_001",
+    title: "Test Two Sum",
+    slug: "test-two-sum",
+    difficulty: "easy" as const,
+    tags: ["array", "hash-table"],
+  },
+  {
+    id: "test_prob_002",
+    title: "Test Valid Parentheses",
+    slug: "test-valid-parentheses",
+    difficulty: "easy" as const,
+    tags: ["string", "stack"],
+  },
+  {
+    id: "test_prob_003",
+    title: "Test Longest Substring",
+    slug: "test-longest-substring",
+    difficulty: "medium" as const,
+    tags: ["string", "sliding-window"],
+  },
+  {
+    id: "test_prob_004",
+    title: "Test Merge K Lists",
+    slug: "test-merge-k-lists",
+    difficulty: "hard" as const,
+    tags: ["linked-list", "heap"],
+  },
+];
+
+async function assertTestDatabase(): Promise<void> {
+  const result = await pool.query("SELECT current_database() AS name");
+
+  if (result.rows[0]?.name !== "askdsa_test") {
+    throw new Error("Refusing to modify data: API tests must use askdsa_test");
+  }
+}
 
 describe("GET /api/problems", () => {
   let server: Server | undefined;
   let baseUrl: string;
+
+  beforeEach(async () => {
+    await assertTestDatabase();
+
+    // The dedicated test database may be reset between test cases.
+    await db.delete(problems).where(
+      // Only remove rows created by this test suite.
+      // Keep this list aligned with testProblems above.
+      inArray(
+        problems.id,
+        testProblems.map((problem) => problem.id),
+      ),
+    );
+    await db.insert(problems).values(testProblems);
+  });
 
   afterEach(async () => {
     if (server?.listening) {
@@ -21,6 +78,16 @@ describe("GET /api/problems", () => {
     }
 
     server = undefined;
+
+    await assertTestDatabase();
+    await db.delete(problems).where(
+      // Only remove rows created by this test suite.
+      // Keep this list aligned with testProblems above.
+      inArray(
+        problems.id,
+        testProblems.map((problem) => problem.id),
+      ),
+    );
   });
 
   async function startServer() {
@@ -54,9 +121,7 @@ describe("GET /api/problems", () => {
   it("applies requested pagination", async () => {
     await startServer();
 
-    const response = await fetch(
-      `${baseUrl}/api/problems?page=1&limit=2`,
-    );
+    const response = await fetch(`${baseUrl}/api/problems?page=1&limit=2`);
     const body = await response.json();
 
     expect(response.status).toBe(200);
