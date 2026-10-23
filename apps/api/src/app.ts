@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { env } from "./config/env.js";
 import { healthRouter } from "./routes/health.js";
+import { errorHandler } from "./middleware/error-handler.js";
 
 export const app = express();
 
@@ -63,3 +64,5 @@ app.use((_req, res) => {
     },
   });
 });
+
+app.use(errorHandler);

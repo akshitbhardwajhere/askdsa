@@ -98,4 +98,22 @@ describe("API endpoints", () => {
 
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
+
+  it("returns a consistent error for malformed JSON", async () => {
+    const response = await fetch(`${baseUrl}/health`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: '{"invalid":',
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "INVALID_JSON",
+        message: "Request body contains invalid JSON",
+      },
+    });
+  });
 });
