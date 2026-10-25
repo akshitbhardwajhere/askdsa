@@ -11,6 +11,8 @@ export const problemSchema = z.object({
 export const listProblemsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  tag: z.string().trim().min(1).max(50).optional(),
 });
 
 export type Problem = z.infer<typeof problemSchema>;

@@ -148,4 +148,93 @@ describe("GET /api/problems", () => {
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
+
+
+  it("filters problems by difficulty", async () => {
+    await startServer();
+
+    const response = await fetch(`${baseUrl}/api/problems?difficulty=easy`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(2);
+    expect(
+      body.data.every(
+        (problem: { difficulty: string }) => problem.difficulty === "easy",
+      ),
+    ).toBe(true);
+    expect(body.pagination.total).toBe(2);
+    expect(body.pagination.totalPages).toBe(1);
+  });
+
+  it("filters by an exact tag", async () => {
+    await startServer();
+
+    const response = await fetch(`${baseUrl}/api/problems?tag=array`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].slug).toBe("test-two-sum");
+    expect(body.pagination.total).toBe(1);
+  });
+
+  it("combines difficulty and tag filters", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?difficulty=easy&tag=string`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].slug).toBe("test-valid-parentheses");
+    expect(body.pagination.total).toBe(1);
+  });
+
+  it("calculates pagination totals after filtering", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?difficulty=easy&limit=1&page=2`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(1);
+    expect(body.pagination).toEqual({
+      page: 2,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+    });
+  });
+
+  it.each([
+    ["difficulty", "expert"],
+    ["tag", "   "],
+  ])("rejects invalid %s filter", async (parameter, value) => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?${parameter}=${encodeURIComponent(value)}`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("does not match partial tags", async () => {
+    await startServer();
+
+    const response = await fetch(`${baseUrl}/api/problems?tag=arr`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(0);
+    expect(body.pagination.total).toBe(0);
+    expect(body.pagination.totalPages).toBe(0);
+  });
 });
