@@ -149,7 +149,6 @@ describe("GET /api/problems", () => {
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 
-
   it("filters problems by difficulty", async () => {
     await startServer();
 
@@ -236,5 +235,47 @@ describe("GET /api/problems", () => {
     expect(body.data).toHaveLength(0);
     expect(body.pagination.total).toBe(0);
     expect(body.pagination.totalPages).toBe(0);
+  });
+
+  it("searches problem titles and slugs case-insensitively", async () => {
+    await startServer();
+
+    const response = await fetch(`${baseUrl}/api/problems?search=TWO`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(1);
+    expect(body.data[0].slug).toBe("test-two-sum");
+    expect(body.pagination.total).toBe(1);
+  });
+
+  it("combines search with difficulty and pagination", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?search=test&difficulty=easy&limit=1`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(1);
+    expect(body.pagination).toEqual({
+      page: 1,
+      limit: 1,
+      total: 2,
+      totalPages: 2,
+    });
+  });
+
+  it("rejects an empty search parameter", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?search=${encodeURIComponent("   ")}`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 });
