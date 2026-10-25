@@ -8,6 +8,13 @@
       "when": 1792779327355,
       "tag": "0000_flaky_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792923620601,
+      "tag": "0001_add_problem_search_indexes",
+      "breakpoints": true
     }
   ]
 }
