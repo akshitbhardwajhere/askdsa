@@ -17,6 +17,7 @@ import {
   encodeProblemCursor,
   listProblemsQuerySchema,
 } from "../schemas/problem.js";
+import { problems as problemsTable } from "@askdsa/db/schema";
 
 export const problemsRouter = Router();
 
@@ -47,7 +48,6 @@ problemsRouter.get(
       }
 
       const { db } = await import("../db/index.js");
-      const { problems: problemsTable } = await import("../db/schema.js");
 
       const filters: SQL[] = [];
 

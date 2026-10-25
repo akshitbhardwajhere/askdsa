@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { app } from "../src/app.js";
 import { db, pool } from "../src/db/index.js";
-import { problems } from "../src/db/schema.js";
+import { problems } from "@askdsa/db/schema";
 import { inArray, sql } from "drizzle-orm";
 
 const testProblems = [

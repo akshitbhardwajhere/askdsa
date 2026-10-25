@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db, pool } from "./index.js";
-import { problems } from "./schema.js";
+import { problems } from "@askdsa/db/schema";
 
 const seedProblems = [
   {

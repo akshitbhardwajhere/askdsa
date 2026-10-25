@@ -34,4 +34,12 @@ export default defineConfig({
     include: ["tests/**/*.test.ts"],
     exclude: ["node_modules/**", "dist/**"],
   },
+  resolve: {
+    alias: {
+      "@askdsa/db/schema": resolve(
+        configDir,
+        "../../packages/db/src/schema.ts",
+      ),
+    },
+  },
 });
