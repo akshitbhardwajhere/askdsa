@@ -199,6 +199,32 @@ describe("GET /api/problems", () => {
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
 
+  it.each([
+    ["empty object", "e30"],
+    ["null payload", "bnVsbA"],
+    ["invalid timestamp", "eyJjcmVhdGVkQXQiOiJub3QtYS1kYXRlIiwiaWQiOiJ4In0"],
+    [
+      "unexpected field",
+      Buffer.from(
+        JSON.stringify({
+          createdAt: "2026-01-01T10:00:00.000Z",
+          id: "test_prob_001",
+          extra: true,
+        }),
+      ).toString("base64url"),
+    ],
+  ])("returns 400 for a cursor with %s", async (_caseName, cursor) => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?mode=cursor&cursor=${encodeURIComponent(cursor)}`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
   it("does not return a next cursor when there are no more results", async () => {
     await startServer();
 
@@ -227,6 +253,19 @@ describe("GET /api/problems", () => {
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("VALIDATION_ERROR");
   });
+
+  it.each(["mode=offset&cursor=abc", "mode=cursor&page=2"])(
+    "rejects incompatible pagination query: %s",
+    async (query) => {
+      await startServer();
+
+      const response = await fetch(`${baseUrl}/api/problems?${query}`);
+      const body = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(body.error.code).toBe("VALIDATION_ERROR");
+    },
+  );
 
   it("filters problems by difficulty", async () => {
     await startServer();
