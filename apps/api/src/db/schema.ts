@@ -31,5 +31,9 @@ export const problems = pgTable(
       table.title.op("gin_trgm_ops"),
     ),
     index("problems_slug_trgm_idx").using("gin", table.slug.op("gin_trgm_ops")),
+    index("problems_created_at_id_idx").on(
+      table.createdAt.desc(),
+      table.id.asc(),
+    ),
   ],
 );

@@ -4,7 +4,7 @@ import type { AddressInfo } from "node:net";
 import { app } from "../src/app.js";
 import { db, pool } from "../src/db/index.js";
 import { problems } from "../src/db/schema.js";
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
 const testProblems = [
   {
@@ -132,6 +132,85 @@ describe("GET /api/problems", () => {
       total: 4,
       totalPages: 2,
     });
+  });
+
+  it("returns the first cursor-paginated page without a cursor", async () => {
+    await startServer();
+
+    const response = await fetch(`${baseUrl}/api/problems?mode=cursor&limit=2`);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(2);
+    expect(body.pagination).toMatchObject({
+      mode: "cursor",
+      limit: 2,
+      hasMore: true,
+    });
+    expect(body.pagination.nextCursor).toEqual(expect.any(String));
+  });
+
+  it("traverses all problems with cursor pagination without duplicates", async () => {
+    await startServer();
+
+    const collectedIds: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const query = new URLSearchParams({
+        mode: "cursor",
+        limit: "2",
+      });
+
+      if (cursor) {
+        query.set("cursor", cursor);
+      }
+
+      const response = await fetch(
+        `${baseUrl}/api/problems?${query.toString()}`,
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+
+      collectedIds.push(
+        ...body.data.map((problem: { id: string }) => problem.id),
+      );
+
+      cursor = body.pagination.nextCursor;
+    } while (cursor);
+
+    expect(collectedIds).toHaveLength(4);
+    expect(new Set(collectedIds).size).toBe(4);
+    expect(new Set(collectedIds)).toEqual(
+      new Set(testProblems.map((problem) => problem.id)),
+    );
+  });
+
+  it("returns 400 for an invalid cursor", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?mode=cursor&cursor=not-a-valid-cursor`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("does not return a next cursor when there are no more results", async () => {
+    await startServer();
+
+    const response = await fetch(
+      `${baseUrl}/api/problems?mode=cursor&limit=50`,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data).toHaveLength(4);
+    expect(body.pagination.hasMore).toBe(false);
+    expect(body.pagination.nextCursor).toBeNull();
   });
 
   it.each([
@@ -277,5 +356,128 @@ describe("GET /api/problems", () => {
 
     expect(response.status).toBe(400);
     expect(body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("traverses cursor pages correctly with filters applied", async () => {
+    await startServer();
+
+    const collectedSlugs: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const query = new URLSearchParams({
+        mode: "cursor",
+        limit: "1",
+        difficulty: "easy",
+      });
+
+      if (cursor) {
+        query.set("cursor", cursor);
+      }
+
+      const response = await fetch(
+        `${baseUrl}/api/problems?${query.toString()}`,
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      collectedSlugs.push(
+        ...body.data.map((item: { slug: string }) => item.slug),
+      );
+      cursor = body.pagination.nextCursor;
+    } while (cursor);
+
+    expect(collectedSlugs).toHaveLength(2);
+    expect(new Set(collectedSlugs).size).toBe(2);
+    expect(collectedSlugs).toContain("test-two-sum");
+    expect(collectedSlugs).toContain("test-valid-parentheses");
+  });
+
+  it("paginates correctly when problems share the same timestamp", async () => {
+    await startServer();
+
+    const fixedTimestamp = new Date("2026-01-01T10:00:00.000Z");
+
+    await db
+      .update(problems)
+      .set({ createdAt: fixedTimestamp })
+      .where(
+        inArray(
+          problems.id,
+          testProblems.map((problem) => problem.id),
+        ),
+      );
+
+    const collectedIds: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const query = new URLSearchParams({
+        mode: "cursor",
+        limit: "1",
+      });
+
+      if (cursor) {
+        query.set("cursor", cursor);
+      }
+
+      const response = await fetch(
+        `${baseUrl}/api/problems?${query.toString()}`,
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+
+      collectedIds.push(
+        ...body.data.map((problem: { id: string }) => problem.id),
+      );
+
+      cursor = body.pagination.nextCursor;
+    } while (cursor);
+
+    expect(collectedIds).toHaveLength(testProblems.length);
+    expect(new Set(collectedIds).size).toBe(testProblems.length);
+
+    // PostgreSQL ordering: createdAt DESC, id ASC.
+    expect(collectedIds).toEqual(
+      [...testProblems.map((problem) => problem.id)].sort(),
+    );
+  });
+
+  it("preserves microsecond precision in cursor timestamps", async () => {
+    await startServer();
+
+    await db.execute(sql`
+    UPDATE problems
+    SET created_at = CASE id
+      WHEN 'test_prob_001' THEN '2026-01-01T10:00:00.123456Z'::timestamptz
+      WHEN 'test_prob_002' THEN '2026-01-01T10:00:00.123789Z'::timestamptz
+      WHEN 'test_prob_003' THEN '2026-01-01T10:00:00.124001Z'::timestamptz
+      WHEN 'test_prob_004' THEN '2026-01-01T10:00:00.124567Z'::timestamptz
+    END
+    WHERE id IN (
+      'test_prob_001',
+      'test_prob_002',
+      'test_prob_003',
+      'test_prob_004'
+    )
+  `);
+
+    const firstResponse = await fetch(
+      `${baseUrl}/api/problems?mode=cursor&limit=1`,
+    );
+    const firstBody = await firstResponse.json();
+
+    expect(firstResponse.status).toBe(200);
+    expect(firstBody.pagination.nextCursor).toEqual(expect.any(String));
+
+    const secondResponse = await fetch(
+      `${baseUrl}/api/problems?mode=cursor&limit=1&cursor=${encodeURIComponent(firstBody.pagination.nextCursor)}`,
+    );
+    const secondBody = await secondResponse.json();
+
+    expect(secondResponse.status).toBe(200);
+    expect(secondBody.data).toHaveLength(1);
+    expect(secondBody.data[0].id).not.toBe(firstBody.data[0].id);
   });
 });
